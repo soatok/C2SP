@@ -3,7 +3,7 @@
 [c2sp.org/cocktail-dkg](https://c2sp.org/cocktail-dkg)
 
 - **Version**: v0.0.1
-- **Authors**: 
+- **Authors**:
   - [Daniel Bourdrez](https://github.com/bytemare)
   - [Soatok Dreamseeker](https://github.com/soatok)
   - [Tjaden Hess](https://github.com/tjade273), *[Trail of Bits](https://trailofbits.com)*
@@ -41,7 +41,7 @@ COCKTAIL is an independent derivative of ChillDKG intended to be used with any F
 
 ## Abstract
 
-COCKTAIL-DKG is a standalone, three-round distributed key generation protocol for threshold signature schemes like 
+COCKTAIL-DKG is a standalone, three-round distributed key generation protocol for threshold signature schemes like
 FROST.
 
 COCKTAIL-DKG allows a group of $n$ participants to securely generate a shared group public key and individual secret
@@ -90,6 +90,7 @@ throughout the COCKTAIL-DKG protocol.
 - $x_i$: The final, long-lived secret share for participant $i$, where $x_i = \sum_{j=1}^{n} s_{j,i}$.
 - $Y_i$: The public verification share for participant $i$.
 - $Y$: The final group public key, where $Y = \sum_{j=1}^{n} C_{j,0}$.
+- $T$: The transcript of the DKG session.
 
 ### Operations
 
@@ -131,7 +132,7 @@ encrypted shares for all other participants.
   * Format: $C_{i,0} || C_{i,1} || \cdots || C_{i,t-1}$
 * $PoP_i$: The Proof of Possession, which is a signature. The size depends on the signature scheme used by the
   ciphersuite.
-* $E_i$: The ephemeral public key, an elliptic curve point. 
+* $E_i$: The ephemeral public key, an elliptic curve point.
   * It does not refer to isogenies. Here, E stands for "ephemeral".
 * $c_{i,j}$: An encrypted secret share. The size depends on the AEAD scheme used by the ciphersuite.
 
@@ -141,7 +142,7 @@ The full message is the concatenation of these elements:
 msg_{1|i} = C_i || PoP_i || E_i || c_{i,1} || c_{i,2} || \cdots || c_{i,n}
 ```
 
-**2. $msg2$ (Coordinator -> All Participants, Round 2)**
+**2. $msg_{2|i}$ (Coordinator -> All Participants, Round 2)**
 
 This message aggregates the public information from all participants.
 
@@ -214,6 +215,7 @@ Each participant $i$ is assumed to have:
    using the secret $a_{i,0}$ as the private key and $C_{i,0}$ as the public key. The message to be signed is
    `context || C_i || E_i`. The specific signature algorithm is defined by the ciphersuite.
 5. **Compute and Encrypt Shares:** For each participant $j$ from $1$ to $n$:
+<<<<<<< HEAD
     1. **Compute Share:** Participant `i` computes the secret share $s_{i,j} = f_i(j)$.
     2. **Derive Key:** Participant `i` computes an ECDH shared secret with participant $j$'s static public key:
        $S_{i,j} = e_i * P_j$. It then derives a symmetric key and nonce for the AEAD.
@@ -226,6 +228,12 @@ Each participant $i$ is assumed to have:
             * $k_{i,j} = H("COCKTAIL-derive-key" || ikm)$
             * $iv_{i,j} = H("COCKTAIL-derive-nonce" || ikm)[0:24]$
             * Here, $H(x)$ is the underlying hash function (e.g., SHA-256).
+=======
+    1. **Compute Share:** Participant $i$ computes the secret share $s_{i,j} = f_i(j)$.
+    2. **Derive Key:** Participant $i$ computes an ECDH shared secret with participant $j$'s static public key:
+       $S_{i,j} = e_i * P_j$. It then derives a symmetric key and nonce for the AEAD:
+       $(k_{i,j}, iv_{i,j}) = H6(S_{i,j}, E_i, P_j, context)$.
+>>>>>>> a6797b1 (More comments on the protocol)
     3. **Encrypt Share:** Participant $i$ encrypts the share for participant $j$:
        $c_{i,j} = Enc(s_{i,j}, k_{i,j}, iv_{i,j})$.
 6. **Broadcast:** Participant $i$ sends their $msg_{1|i}$ to the coordinator.
@@ -233,14 +241,14 @@ Each participant $i$ is assumed to have:
 ### Round 2: Share Decryption and Verification
 
 The coordinator waits to receive $msg_{1|i}$ from all $n$ participants. It then broadcasts a list of all received messages
-to every participant. Upon receiving the list of all $msg_{1|i}$ messages, each participant `i` performs the following
+to every participant. Upon receiving the list of all $msg_{1|i}$ messages, each participant $i$ performs the following
 steps:
 
-1. **Verify All PoPs:** For each other participant $j$ from $1$ to $n$:
+1. **Verify All PoPs:** For each participant $j \neq i$ from $1$ to $n$:
     - Participant $i$ verifies the proof of possession $PoP_j$. The signature is checked against the message
       `context || C_j || E_j`, using participant $j$'s public commitment $C_{j,0}$ as the public key.
     - If any $PoP_j$ is invalid, participant $i$ **MUST** abort, identifying participant $j$ as malicious.
-2. **Decrypt and Verify Shares:** For each other participant $j$ from $1$ to $n$:
+2. **Decrypt and Verify Shares:** For each participant $j \neq i$ from $1$ to $n$:
     1. **Derive Key:** Participant $i$ computes the ECDH shared secret with participant $j$'s ephemeral public key:
        $S_{j,i} = d_i * E_j$. They then derive the symmetric key and nonce:
         * If the hash function has an output length at least 480 bits long:
@@ -324,7 +332,7 @@ The following categories cover the most common errors:
 3. **Protocol Logic Errors**:
     * **Description**: These errors relate to violations of the protocol's state machine or rules, such as:
         * A participant sending a message at the wrong time.
-        * The coordinator broadcasting an inconsistent `msg2` (e.g., omitting a participant's data).
+        * The coordinator broadcasting an inconsistent $msg_{2|i}$ (e.g., omitting a participant's data).
     * **Action**: These errors indicate a faulty participant or coordinator. The protocol **MUST** be aborted.
       If the error can be traced to a specific participant, they should be blamed.
 
@@ -341,7 +349,7 @@ accountability in decentralized systems.
 * **Participant's Role and Public Proofs**: Participants **MUST** validate all data they receive.
   * If participant $i$ fails to verify a share $s_{j,i}$ from participant $j$, it **MUST** abort. To prove that $j$
     is cheating, participant $i$ can broadcast a blame message containing $j$'s index and the invalid share $s_{j,i}$.
-    Any third party can then verify this claim by checking the VSS equation 
+    Any third party can then verify this claim by checking the VSS equation
     ($s_{j,i} \cdot B = \sum_{k=0}^{t-1} i^k \cdot C_{j,k}$)
     using the public commitment $C_j$. A failure of this equation is a public and undeniable proof of $j$'s misbehavior.
   * Similarly, if a PoP from participant $j$ is invalid, this is also a publicly verifiable proof of misbehavior,
@@ -358,7 +366,7 @@ accountability in decentralized systems.
     broadcasting it, the PoP will fail for all other participants, who will blame $j$. However, in Round 3,
     participant $j$ will construct a transcript based on their *original*, valid $msg_{1|j}$. Their signature $sig_j$
     will be valid for their transcript but not for the altered transcript held by others. When this signature
-    mismatch is detected, participant $j$ can reveal their original $msg_{1|j}$ (with its valid PoP) and their 
+    mismatch is detected, participant $j$ can reveal their original $msg_{1|j}$ (with its valid PoP) and their
     transcript signature. This evidence proves their honesty and definitively identifies the coordinator as malicious.
 
 ## Ciphersuites
@@ -370,12 +378,12 @@ Each ciphersuite defines a key derivation function $H6(x, pk1, pk2, extra)$, an 
 and a decryption method $Dec(cipher, key, iv)$. Ciphersuites **SHOULD** use an AEAD mode for $Enc()$ and $Dec()$.
 
 The choice of AEAD is guided by the principle of preventing nonce reuse. For ciphersuites where the underlying hash
-function provides a large enough output (at least 480 bits; e.g., SHA-512), we can derive both the 256-bit key and a 
+function provides a large enough output (at least 480 bits; e.g., SHA-512), we can derive both the 256-bit key and a
 24-byte (192-bit) nonce (which is long enough to be generated randomly with a negligible chance of collision).
 
 For ciphersuites based on SHA-256, where the output is smaller than 480 bits, we use $H6()$ to derive an Input Keying
 Material (IKM), which is then used with the underlying hash function with two different prefixes. For the key, we use
-$Sha256("COCKTAIL-derive-key" || ikm)$. For the nonce, we use the most significant 192 bits of 
+$Sha256("COCKTAIL-derive-key" || ikm)$. For the nonce, we use the most significant 192 bits of
 $Sha256("COCKTAIL-derive-nonce" || ikm)$. The AEAD of choice for the SHA-256 based ciphersuites we specify here is
 [XAES-256-GCM](https://github.com/C2SP/C2SP/blob/main/XAES-256-GCM.md).
 
@@ -463,9 +471,9 @@ The output of $H6$ is used to derive the key and nonce for the AEAD.
   confidentiality against an eavesdropper on the communication channel and authenticity to prevent a man-in-the-middle
   from tampering with the shares. The key is derived using an ECDH key exchange, ensuring that only the intended
   recipient can decrypt their share.
-- **Cofactor Security**: As noted in the [Ciphersuite-Specific Considerations](#ciphersuite-specific-considerations) 
+- **Cofactor Security**: As noted in the [Ciphersuite-Specific Considerations](#ciphersuite-specific-considerations)
   section, curves like Ed25519 and Ed448 have small cofactors. It is critical that implementations use prime-order group
-  abstractions like Ristretto255 and Decaf448 to prevent small subgroup attacks, where an attacker could submit a 
+  abstractions like Ristretto255 and Decaf448 to prevent small subgroup attacks, where an attacker could submit a
   low-order point to leak information.
 - **Participant Authentication**: Throughout the protocol, participants are authenticated to each other via their
   long-term static key pairs. The pairwise ECDH key agreement used to encrypt shares in Round 1 provides deniable
@@ -509,7 +517,7 @@ will be too.
   participants, which can be complex to set up. COCKTAIL-DKG removes this requirement by building in its own encryption
   layer (EncPedPop), making it usable over insecure, unauthenticated channels.
 
-# Appendix A: Pseudocode 
+# Appendix A: Pseudocode
 
 This appendix provides a series of algorithms that describe the COCKTAIL-DKG protocol in a high-level,
 implementation-agnostic manner. The notation is meant to be illustrative rather than strictly formal.
@@ -657,7 +665,7 @@ function VerifyShare(s_ji, i, C_j, G, t):
               - ikm = H6(ecdh_secret, E_i, P_j, context)
               - key = H("COCKTAIL-derive-key" || ikm)
               - nonce = H("COCKTAIL-derive-nonce" || ikm)[0:24]
-            - If the hash function used has an output size greater than equal to 480 bits, just split them:  
+            - If the hash function used has an output size greater than equal to 480 bits, just split them:
               - tmp = H6(ecdh_secret, E_i, P_j, context)
               - key = tmp[0:32] (32 bytes)
               - nonce = tmp[32:46] (24 bytes)
