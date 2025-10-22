@@ -174,7 +174,7 @@ This is the final message, containing all signatures on the transcript.
 The message is structured as:
 
 ```math
-aggregated_sigs = sig_1 || sig_2 || \cdots || sig_n
+aggregated_sigs = sig_1 \parallel sig_2 \parallel \cdots \parallel sig_n
 ```
 
 ### Cryptographic Primitives
